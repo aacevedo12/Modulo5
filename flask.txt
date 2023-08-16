@@ -1,0 +1,58 @@
+from flask import Flask, render_template, request
+import redis
+
+app = Flask(__name__)
+
+cliente = redis.Redis(host='localhost', port=6379, db=0)
+
+def buscar_significado_palabra(palabra):
+    significado = cliente.get(palabra)
+    if significado:
+        return significado.decode()
+    else:
+        return None
+
+@app.route("/")
+def index():
+    return render_template("index.html")
+
+@app.route("/agregar_palabra", methods=["POST"])
+def agregar_palabra():
+    palabra = request.form["palabra"]
+    posible_significado = buscar_significado_palabra(palabra)
+    if posible_significado:
+        return f"La palabra '{palabra}' ya existe"
+    else:
+        significado = request.form["significado"]
+        cliente.set(palabra, significado)
+        return "Palabra agregada"
+
+@app.route("/editar_palabra", methods=["POST"])
+def editar_palabra():
+    palabra = request.form["palabra"]
+    nuevo_significado = request.form["nuevo_significado"]
+    cliente.set(palabra, nuevo_significado)
+    return "Palabra actualizada"
+
+@app.route("/eliminar_palabra", methods=["POST"])
+def eliminar_palabra():
+    palabra = request.form["palabra"]
+    cliente.delete(palabra)
+    return "Palabra eliminada"
+
+@app.route("/ver_listado_palabras")
+def ver_listado_palabras():
+    palabras = cliente.keys("*")
+    return render_template("listado_palabras.html", palabras=palabras)
+
+@app.route("/buscar_significado_palabra", methods=["POST"])
+def buscar_significado_palabra():
+    palabra = request.form["palabra"]
+    significado = buscar_significado_palabra(palabra)
+    if significado:
+        return render_template("significado_palabra.html", palabra=palabra, significado=significado)
+    else:
+        return f"Palabra '{palabra}' no encontrada"
+
+if __name__ == '__main__':
+    app.run(debug=True)
